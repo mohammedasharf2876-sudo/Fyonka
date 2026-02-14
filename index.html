@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>فيونكة - Fyonka Gallery</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { 
+            font-family: 'Cairo', sans-serif; 
+            background-color: #fff5f7; 
+            margin: 0; 
+            padding: 0;
+            overscroll-behavior: none;
+        }
+        /* تصميم يشبه الموبايل حتى لو فتحته من كمبيوتر */
+        .mobile-container {
+            max-width: 450px;
+            margin: 0 auto;
+            background: white;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 0 20px rgba(0,0,0,0.05);
+            position: relative;
+        }
+        .chat-area {
+            flex: 1;
+            overflow-y: auto;
+            padding: 15px;
+            background-image: url('https://www.transparenttextures.com/patterns/pink-dust.png');
+        }
+        .bubble {
+            max-width: 80%;
+            padding: 12px 16px;
+            border-radius: 20px;
+            font-size: 14px;
+            line-height: 1.6;
+            margin-bottom: 10px;
+            position: relative;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.02);
+        }
+        .bot {
+            background: #ffffff;
+            color: #444;
+            align-self: flex-start;
+            border-bottom-right-radius: 4px;
+            border: 1px solid #fce4ec;
+        }
+        .user {
+            background: #ff85a2;
+            color: white;
+            align-self: flex-end;
+            border-bottom-left-radius: 4px;
+        }
+        .input-box {
+            background: white;
+            padding: 15px;
+            border-top: 1px solid #ffebee;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        input {
+            flex: 1;
+            background: #f8f9fa;
+            border: 1px solid #eee;
+            padding: 12px 20px;
+            border-radius: 30px;
+            outline: none;
+            font-size: 14px;
+        }
+        .send-btn {
+            background: #ff5c8d;
+            color: white;
+            width: 45px;
+            height: 45px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: none;
+            cursor: pointer;
+            box-shadow: 0 4px 10px rgba(255, 92, 141, 0.3);
+        }
+        /* أنيميشن التحميل */
+        .typing { display: flex; gap: 4px; padding: 10px; }
+        .dot { width: 6px; height: 6px; background: #ff85a2; border-radius: 50%; animation: blink 1.4s infinite; }
+        .dot:nth-child(2) { animation-delay: 0.2s; }
+        .dot:nth-child(3) { animation-delay: 0.4s; }
+        @keyframes blink { 0%, 100% { opacity: 0.3; } 50% { opacity: 1; } }
+    </style>
+</head>
+<body>
+
+<div class="mobile-container">
+    <header class="bg-[#ff5c8d] p-4 text-white flex items-center gap-3 shadow-lg">
+        <div class="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center text-xl">🎀</div>
+        <div>
+            <h1 class="font-bold text-base">فيونكة - Fyonka</h1>
+            <p class="text-[10px] opacity-80">متصل الآن • خبيرة الإكسسوارات</p>
+        </div>
+    </header>
+
+    <div id="chatBox" class="chat-area flex flex-col">
+        </div>
+
+    <div id="loading" class="hidden">
+        <div class="typing"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>
+    </div>
+
+    <div class="input-box">
+        <input type="text" id="userInput" placeholder="اسألي فيونكة عن قطعة..." onkeypress="if(event.key==='Enter') sendMessage()">
+        <button class="send-btn" onclick="sendMessage()">
+            <svg style="transform: rotate(180deg)" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+        </button>
+    </div>
+</div>
+
+<script>
+    const API_KEY = "AIzaSyBYuDzE05mcTjRn6y9OC3UQbH6ppD4OXL4";
+    
+    // بيانات سريعة لمحل الهدايا
+    const FyonkaDB = {
+        "خاتم": "💍 الخاتم يجنن عليكي! بس نصيحة فيونكة: ابعدي عنه الصابون والمية عشان فصوصه تفضل تلمع، ولو دخلتي الحمام اقلعيه أحسن عشان ميتزحلقش من الصابون ويضيع.",
+        "سلسلة": "📿 السلاسل الرقيقة دي بتحب الدلع، بلاش تنامي بيها عشان متتعقدش، ولو رشة برفان استني لما تنشف وبعدين البسيها.",
+        "ساعة": "⌚ ساعتك شياكتك! حتى لو ضد المية بلاش تعرضيها للصابون والمواد الكيماوية عشان الجلد أو المعدن مغيرش لون.",
+        "غوايش": "💫 الغوايش دي محتاجة حرص، ابعديها عن الخبطات الجامدة ولمعيها بقطنة ناشفة هترجع تبرق.",
+        "عامة": "نورتي فيونكة يا قمر! 🎀 أي قطعة عندنا بتحتاج عناية بسيطة: ابعدي عنها المية والكحول والبرفان المباشر هتعيش معاكي العمر كله."
+    };
+
+    const params = new URLSearchParams(window.location.search);
+    const pType = params.get('type') || "عامة";
+
+    function addMsg(text, side) {
+        const box = document.getElementById('chatBox');
+        const div = document.createElement('div');
+        div.className = `bubble ${side}`;
+        div.innerHTML = text;
+        box.appendChild(div);
+        box.scrollTop = box.scrollHeight;
+    }
+
+    // ترحيب أولي
+    setTimeout(() => {
+        let msg = `أهلاً بيكي في فيونكة! 🎀 ذوقك في الـ <b>${pType}</b> يجنن.`;
+        if(FyonkaDB[pType]) msg += `<br><br>${FyonkaDB[pType]}`;
+        addMsg(msg, 'bot');
+    }, 500);
+
+    async function sendMessage() {
+        const input = document.getElementById('userInput');
+        const text = input.value.trim();
+        if(!text) return;
+
+        addMsg(text, 'user');
+        input.value = '';
+        document.getElementById('loading').classList.remove('hidden');
+
+        try {
+            const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_KEY}`, {
+                method: "POST",
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify({
+                    contents: [{ parts: [{ text: `أنت مساعدة في محل إكسسوارات اسمه "فيونكة". ردي بلهجة مصرية بناتية ودودة جداً. الزبونة بتسأل عن ${pType}. السؤال هو: ${text}` }] }]
+                })
+            });
+            const data = await res.json();
+            const reply = data.candidates[0].content.parts[0].text;
+            document.getElementById('loading').classList.add('hidden');
+            addMsg(reply, 'bot');
+        } catch (e) {
+            document.getElementById('loading').classList.add('hidden');
+            addMsg("معلش يا قمر النت هنج، اسألي فيونكة تاني 🎀", 'bot');
+        }
+    }
+</script>
+
+</body>
+</html>
