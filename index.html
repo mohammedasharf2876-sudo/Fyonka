@@ -1,4 +1,4 @@
-<!-- index.html  — واجهة الشات (آمنة + بتعرض ردود الإكسسوارات/الميكاب/السكين كير) -->
+<!-- index.html — (FIXED ✅) مفيهوش replaceAll + فيه hidden CSS + الإرسال شغال -->
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
@@ -10,6 +10,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap" rel="stylesheet">
 
   <style>
+    .hidden{display:none !important;}
     body{font-family:'Cairo',sans-serif;background:#fff5f7;margin:0;padding:0;overscroll-behavior:none}
     .mobile-container{max-width:450px;margin:0 auto;background:#fff;height:100vh;display:flex;flex-direction:column;box-shadow:0 0 20px rgba(0,0,0,.05)}
     .chat-area{flex:1;overflow-y:auto;padding:15px;background-image:url('https://www.transparenttextures.com/patterns/pink-dust.png')}
@@ -46,4 +47,96 @@
   <div class="input-box">
     <input type="text" id="userInput" placeholder="اسألي فيونكة عن إكسسوارات/ميكاب/سكين كير...">
     <button id="sendBtn" class="send-btn" onclick="sendMessage()">
-      <svg style="transform: rotate(180deg)" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+      <svg style="transform: rotate(180deg)" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+        <path d="M5 12h14M12 5l7 7-7 7"/>
+      </svg>
+    </button>
+  </div>
+</div>
+
+<script>
+  var params = new URLSearchParams(location.search);
+  var pType = (params.get("type") || "عامة").trim();
+
+  function escapeHTML(str){
+    return String(str)
+      .replace(/&/g,"&amp;")
+      .replace(/</g,"&lt;")
+      .replace(/>/g,"&gt;")
+      .replace(/"/g,"&quot;")
+      .replace(/'/g,"&#039;");
+  }
+
+  function formatBot(text){
+    var safe = escapeHTML(text);
+    safe = safe.replace(/\*\*(.+?)\*\*/g, "<b>$1</b>");
+    safe = safe.replace(/\n/g, "<br>");
+    return safe;
+  }
+
+  function addMsg(text, side, html){
+    var box = document.getElementById('chatBox');
+    var div = document.createElement('div');
+    div.className = 'bubble ' + side;
+    if (html) div.innerHTML = text;
+    else div.textContent = text;
+    box.appendChild(div);
+    box.scrollTop = box.scrollHeight;
+  }
+
+  setTimeout(function(){
+    addMsg(
+      "أهلاً بيكي يا قمر 🎀<br><b>أنا فيونكة</b>… اسأليني عن:<br>✅ إكسسوارات<br>✅ ميكاب<br>✅ سكين كير<br><br>ابدأي بسؤالِك 💗",
+      "bot",
+      true
+    );
+  }, 250);
+
+  document.getElementById("userInput").addEventListener("keydown", function(e){
+    if (e.key === "Enter") sendMessage();
+  });
+
+  var busy = false;
+
+  async function sendMessage(){
+    if (busy) return;
+
+    var input = document.getElementById('userInput');
+    var text = (input.value || "").trim();
+    if(!text) return;
+
+    addMsg(text, 'user', false);
+    input.value = "";
+
+    document.getElementById('loading').classList.remove('hidden');
+    busy = true;
+    document.getElementById('sendBtn').disabled = true;
+
+    try {
+      var res = await fetch("/api/chat", {
+        method: "POST",
+        headers: {"Content-Type":"application/json"},
+        body: JSON.stringify({ type: pType, message: text })
+      });
+
+      var raw = await res.text();
+      var data = {};
+      try { data = raw ? JSON.parse(raw) : {}; } catch(e){}
+
+      var reply = data.reply ? String(data.reply) : "معلش يا قمر… قولي تاني 🎀";
+      addMsg(formatBot(reply), 'bot', true);
+
+    } catch (e) {
+      addMsg("معلش يا قمر حصل مشكلة… جرّبي تاني 🎀", 'bot', false);
+    } finally {
+      document.getElementById('loading').classList.add('hidden');
+      busy = false;
+      document.getElementById('sendBtn').disabled = false;
+    }
+  }
+
+  window.sendMessage = sendMessage;
+</script>
+
+</body>
+</html>
