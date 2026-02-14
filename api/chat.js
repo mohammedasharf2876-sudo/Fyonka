@@ -1,5 +1,4 @@
-// api/chat.js  (NO KEY NEEDED ✅) — فيونكة: إكسسوارات + ميكاب + سكين كير (مصري بناتي)
-
+// api/chat.js  ✅ (NO KEY) — شغال على Vercel
 function send(res, status, obj) {
   res.statusCode = status;
   res.setHeader("Content-Type", "application/json; charset=utf-8");
@@ -9,59 +8,59 @@ function send(res, status, obj) {
 
 function readBodyJSON(req) {
   return new Promise((resolve) => {
+    // لو Vercel عامل parsing جاهز
     if (req.body && typeof req.body === "object") return resolve(req.body);
 
     let raw = "";
     req.on("data", (c) => (raw += c));
     req.on("end", () => {
-      try { resolve(raw ? JSON.parse(raw) : {}); }
-      catch { resolve({}); }
+      if (!raw) return resolve({});
+      try { resolve(JSON.parse(raw)); } catch { resolve({}); }
     });
   });
 }
 
-// ===== “برومبت خفيف” على شكل قواعد رد =====
-function wrapReply({ opener, title, bullets = [], steps = [], note, ask }) {
-  const out = [];
+function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+function hasAny(msg, arr) {
+  for (let i = 0; i < arr.length; i++) if (msg.indexOf(arr[i]) !== -1) return true;
+  return false;
+}
+
+function wrapReply(opener, title, bullets, ask, note) {
+  var out = [];
   if (opener) out.push(opener);
-  if (title) out.push(`**${title}**`);
-  if (bullets.length) {
+  if (title) out.push("**" + title + "**");
+  if (bullets && bullets.length) {
     out.push("");
-    for (const b of bullets) out.push(`✅ ${b}`);
-  }
-  if (steps.length) {
-    out.push("");
-    out.push("**خطوات سريعة:**");
-    for (let i = 0; i < steps.length; i++) out.push(`${i + 1}) ${steps[i]}`);
+    for (var i = 0; i < bullets.length; i++) out.push("✅ " + bullets[i]);
   }
   if (note) {
     out.push("");
-    out.push(`⚠️ ${note}`);
+    out.push("⚠️ " + note);
   }
   if (ask) {
     out.push("");
-    out.push(`سؤال صغير يا قمر: ${ask}`);
+    out.push("سؤال صغير يا قمر: " + ask);
   }
   return out.join("\n");
 }
 
-function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
-function hasAny(msg, arr) { return arr.some((k) => msg.indexOf(k) !== -1); }
+function domainOf(message) {
+  var m = message;
 
-function detectDomain(message) {
-  const m = message;
-  const skincareKeys = ["سكين", "بشرة", "روتين", "غسول", "مرطب", "واقي", "spf", "سيرم", "فيتامين", "نياسيناميد", "هيالورونيك", "ريتينول", "تقشير", "aha", "bha", "ساليسيليك", "جليكوليك", "حساسية", "حكة", "تهيج", "احمرار"];
-  const makeupKeys = ["ميكاب", "makeup", "فاونديشن", "كونسيلر", "بودرة", "برايمر", "بلاشر", "برونزر", "هايلايتر", "آيشادو", "ايشادو", "آيلاينر", "ايلاينر", "ماسكارا", "روج", "ليب", "حواجب", "setting", "ستنج", "سبراي"];
-  const accKeys = ["خاتم", "سلسلة", "انسيال", "غوايش", "حلق", "توكة", "دبوس", "كوليه", "خلخال", "اكسسوار", "إكسسوار", "ستانلس", "فضة", "مطلي"];
+  var skincare = ["بشرة","سكين","روتين","غسول","مرطب","واقي","spf","سيرم","فيتامين","نياسيناميد","هيالورونيك","ريتينول","تقشير","aha","bha","ساليسيليك","جليكوليك","حساسية","تهيج","احمرار","حكة","حبوب","تصبغات","مسام"];
+  var makeup   = ["ميكاب","makeup","فاونديشن","كونسيلر","بودرة","برايمر","بلاشر","برونزر","هايلايتر","ايشادو","آيشادو","ايلاينر","آيلاينر","ماسكارا","روج","ليب","حواجب","ستنج","setting","سبراي"];
+  var acc      = ["خاتم","سلسلة","سلسله","انسيال","اسورة","أسورة","سوار","غوايش","غويشة","حلق","قرط","خلخال","توكة","دبوس","كوليه","اكسسوار","إكسسوار","ستانلس","فضة","مطلي","مطليه"];
 
-  if (hasAny(m, skincareKeys)) return "skincare";
-  if (hasAny(m, makeupKeys)) return "makeup";
-  if (hasAny(m, accKeys)) return "accessories";
+  if (hasAny(m, skincare)) return "skincare";
+  if (hasAny(m, makeup)) return "makeup";
+  if (hasAny(m, acc)) return "accessories";
   return "general";
 }
 
-function detectAccessoryType(message, hintType) {
-  const m = message;
+// ---------- Accessories ----------
+function accessoryType(message, hint) {
+  var m = message;
   if (m.indexOf("خاتم") !== -1) return "خاتم";
   if (m.indexOf("سلسلة") !== -1 || m.indexOf("سلسله") !== -1 || m.indexOf("كوليه") !== -1) return "سلسلة";
   if (m.indexOf("انسيال") !== -1 || m.indexOf("اسورة") !== -1 || m.indexOf("أسورة") !== -1 || m.indexOf("سوار") !== -1) return "انسيال";
@@ -69,36 +68,14 @@ function detectAccessoryType(message, hintType) {
   if (m.indexOf("حلق") !== -1 || m.indexOf("قرط") !== -1) return "حلق";
   if (m.indexOf("خلخال") !== -1) return "خلخال";
   if (m.indexOf("توكة") !== -1 || m.indexOf("دبوس") !== -1) return "توك/دبابيس";
-  return hintType || "عامة";
+  return hint || "عامة";
 }
 
-function detectSkinType(message) {
-  const m = message;
-  if (hasAny(m, ["دهنية", "دهنيه", "زيتية"])) return "دهنية";
-  if (hasAny(m, ["جافة", "جافه", "ناشفة", "ناشفه"])) return "جافة";
-  if (hasAny(m, ["مختلطة", "مخلطة", "ميكس"])) return "مختلطة";
-  if (hasAny(m, ["حساسة", "حساسه"])) return "حساسة";
-  if (hasAny(m, ["عادية", "عاديه"])) return "عادية";
-  return "";
-}
-
-function detectConcern(message) {
-  const m = message;
-  if (hasAny(m, ["حبوب", "حباية", "acne"])) return "حبوب";
-  if (hasAny(m, ["تصبغات", "بقع", "اسمرار", "كلف"])) return "تصبغات";
-  if (hasAny(m, ["مسام", "pore"])) return "مسام";
-  if (hasAny(m, ["جفاف", "شد", "تقشير"])) return "جفاف";
-  if (hasAny(m, ["حساسية", "تهيج", "احمرار", "حكة"])) return "حساسية";
-  if (hasAny(m, ["بهتان", "glow", "اشراق"])) return "بهتان";
-  return "";
-}
-
-// ===== Accessories =====
-const ACCESSORY_TIPS = {
+var ACC_TIPS = {
   "خاتم": [
     "ابعديه عن المية والصابون والكحول عشان اللون والفصوص يفضلوا حلوين.",
-    "شيليه وقت الحمّام/غسيل المواعين… عشان مايزحلقش ويتوه.",
-    "خزنيه لوحده في كيس قماش/علبة عشان ميخربش مع القطع التانية."
+    "شيليه وقت الحمام/غسيل المواعين عشان مايزحلقش ويتوه.",
+    "خزنيه لوحده في كيس قماش/علبة عشان ميخربش مع غيره."
   ],
   "سلسلة": [
     "بلاش نوم بيها عشان متتعقدش.",
@@ -111,51 +88,4 @@ const ACCESSORY_TIPS = {
     "امسحيه بعد اللبس بقطنة ناشفة."
   ],
   "غوايش": [
-    "ابعديها عن الخبطات عشان متتجرحش.",
-    "لمّعي بقطنة ناشفة/ميكروفايبر.",
-    "متتخزّنش وهي مبلولة."
-  ],
-  "حلق": [
-    "لو ودنك بتتحسس: اختاري ستانلس/فضة ونضفي قبل اللبس.",
-    "متناميش بيه لو طويل/مدلّي.",
-    "بلاش عطر مباشر عليه."
-  ],
-  "خلخال": [
-    "ابعديه عن المية والكلور.",
-    "خزنيه لوحده عشان ميخدش خدوش.",
-    "امسحيه ناشف بعد اللبس."
-  ],
-  "توك/دبابيس": [
-    "خليهم بعيد عن المية عشان المعدن ميسوّسش.",
-    "تنضيف خفيف بفرشة ناعمة ناشفة.",
-    "خزنيهم في علبة مقسّمة."
-  ],
-  "عامة": [
-    "قاعدة فيونكة: مية + عطر + كحول = عمر القطعة يقصر 😄",
-    "خزّني كل قطعة لوحدها وامسحيها ناشف بعد اللبس.",
-    "لو اللون بيغمق بسرعة: غالبًا عرق/عطر… خليه بعيد."
-  ]
-};
-
-function accessoryReply(message, hintType) {
-  const type = detectAccessoryType(message, hintType);
-  const tips = (ACCESSORY_TIPS[type] || ACCESSORY_TIPS["عامة"]).slice(0, 5);
-
-  return wrapReply({
-    opener: pick(["يا هلا يا قمر 🎀", "تمام يا جميلة 💗", "حاضر يا حبّي ✨"]),
-    title: `إكسسوارات — ${type}`,
-    bullets: tips,
-    ask: "القطعة خامتها إيه؟ (ستانلس/مطلي/فضة) وبتتلبس يوميًا ولا مناسبات؟"
-  });
-}
-
-// ===== Makeup =====
-function makeupReply(message) {
-  const m = message;
-  let focus = "ميكاب";
-  if (hasAny(m, ["فاونديشن","foundation"])) focus = "فاونديشن";
-  else if (hasAny(m, ["كونسيلر","concealer"])) focus = "كونسيلر";
-  else if (hasAny(m, ["بودرة","powder"])) focus = "بودرة";
-  else if (hasAny(m, ["بلاشر","blush"])) focus = "بلاشر";
-  else if (hasAny(m, ["روج","ليب","lip"])) focus = "روج";
-  else if (hasAny(m, ["ماسكارا","m]()
+    "ابعديها عن الخبطات عشان متتجرح
