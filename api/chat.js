@@ -1,18 +1,46 @@
-// api/chat.js
 export default async function handler(req, res) {
+  // Helpers
+  const send = (status, obj) => {
+    res.status(status);
+    res.setHeader("Content-Type", "application/json; charset=utf-8");
+    res.setHeader("Cache-Control", "no-store");
+    return res.end(JSON.stringify(obj));
+  };
+
+  const readBodyJSON = async () => {
+    // لو Vercel عامل parsing جاهز
+    if (req.body && typeof req.body === "object") return req.body;
+
+    // Parse يدوي مضمون
+    let raw = "";
+    for await (const chunk of req) raw += chunk;
+    if (!raw) return {};
+    try { return JSON.parse(raw); } catch { return {}; }
+  };
+
   try {
+    // Debug GET: افتح /api/chat في المتصفح وشوف ok/hasKey
+    if (req.method === "GET") {
+      return send(200, {
+        ok: true,
+        route: "/api/chat",
+        hasKey: !!process.env.GEMINI_API_KEY,
+        model: process.env.GEMINI_MODEL || "gemini-1.5-flash"
+      });
+    }
+
     if (req.method === "OPTIONS") return res.status(204).end();
-    if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
+    if (req.method !== "POST") return send(405, { error: "Method not allowed" });
 
     const key = process.env.GEMINI_API_KEY;
-    if (!key) return res.status(500).json({ error: "Missing GEMINI_API_KEY" });
+    if (!key) return send(500, { error: "Missing GEMINI_API_KEY (Vercel Env Vars)" });
 
-    const body = req.body || {};
+    const body = await readBodyJSON();
     const type = String(body.type || "عامة");
     const message = String(body.message || "").trim();
     const history = Array.isArray(body.history) ? body.history : [];
 
-    if (!message) return res.status(400).json({ error: "Empty message" });
+    if (!message) return send(400, { error: "Empty message received" });
 
     const model = process.env.GEMINI_MODEL || "gemini-1.5-flash";
 
@@ -49,16 +77,17 @@ export default async function handler(req, res) {
     });
 
     const data = await r.json().catch(() => ({}));
+
     if (!r.ok) {
-      return res.status(500).json({ error: "Gemini API error", details: data });
+      return send(500, { error: "Gemini API error", details: data });
     }
 
     const reply =
       data?.candidates?.[0]?.content?.parts?.map((p) => p?.text).filter(Boolean).join("\n") ||
       "معلش يا قمر… قولي تاني بشكل أبسط 🎀";
 
-    return res.status(200).json({ reply });
+    return send(200, { reply });
   } catch (e) {
-    return res.status(500).json({ error: "Server error", details: String(e?.message || e) });
+    return send(500, { error: "Server error", details: String(e?.message || e) });
   }
 }
