@@ -1,23 +1,40 @@
 export default {
   async fetch(request) {
+    const json = (obj, status = 200) =>
+      new Response(JSON.stringify(obj), {
+        status,
+        headers: {
+          "Content-Type": "application/json; charset=utf-8",
+          "Cache-Control": "no-store",
+        },
+      });
+
     try {
+      if (request.method === "OPTIONS") {
+        // احتياطي لو فيه CORS
+        return new Response(null, {
+          status: 204,
+          headers: {
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "POST, OPTIONS",
+            "Access-Control-Allow-Headers": "Content-Type",
+          },
+        });
+      }
+
       if (request.method !== "POST") {
-        return Response.json({ error: "Method not allowed" }, { status: 405 });
+        return json({ error: "Method not allowed. Use POST." }, 405);
       }
 
       const key = process.env.GEMINI_API_KEY;
-      if (!key) {
-        return Response.json({ error: "Missing GEMINI_API_KEY" }, { status: 500 });
-      }
+      if (!key) return json({ error: "Missing GEMINI_API_KEY on Vercel env vars" }, 500);
 
       const body = await request.json().catch(() => ({}));
       const type = String(body.type || "عامة");
       const message = String(body.message || "").trim();
       const history = Array.isArray(body.history) ? body.history : [];
 
-      if (!message) {
-        return Response.json({ error: "Empty message" }, { status: 400 });
-      }
+      if (!message) return json({ error: "Empty message" }, 400);
 
       const model = process.env.GEMINI_MODEL || "gemini-2.0-flash";
 
@@ -54,20 +71,19 @@ export default {
       });
 
       const data = await r.json().catch(() => ({}));
+
       if (!r.ok) {
-        return Response.json({ error: "Gemini API error", details: data }, { status: 500 });
+        // خلي الرسالة واضحة عشان تعرف السبب بسرعة
+        return json({ error: "Gemini API error", details: data }, 500);
       }
 
       const reply =
         data?.candidates?.[0]?.content?.parts?.map((p) => p?.text).filter(Boolean).join("\n") ||
         "معلش يا قمر… قولي تاني بشكل أبسط 🎀";
 
-      return Response.json({ reply }, { status: 200 });
+      return json({ reply }, 200);
     } catch (e) {
-      return Response.json(
-        { error: "Server error", details: String(e?.message || e) },
-        { status: 500 }
-      );
+      return json({ error: "Server error", details: String(e?.message || e) }, 500);
     }
   },
 };
