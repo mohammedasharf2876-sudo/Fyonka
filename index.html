@@ -118,9 +118,7 @@
     </div>
 </div>
 
-<script>
-    const API_KEY = "AIzaSyBYuDzE05mcTjRn6y9OC3UQbH6ppD4OXL4";
-    
+<script>   
     // بيانات سريعة لمحل الهدايا
     const FyonkaDB = {
         "خاتم": "💍 الخاتم يجنن عليكي! بس نصيحة فيونكة: ابعدي عنه الصابون والمية عشان فصوصه تفضل تلمع، ولو دخلتي الحمام اقلعيه أحسن عشان ميتزحلقش من الصابون ويضيع.",
@@ -159,15 +157,19 @@
         document.getElementById('loading').classList.remove('hidden');
 
         try {
-            const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_KEY}`, {
-                method: "POST",
-                headers: {"Content-Type": "application/json"},
-                body: JSON.stringify({
-                    contents: [{ parts: [{ text: `أنت مساعدة في محل إكسسوارات اسمه "فيونكة". ردي بلهجة مصرية بناتية ودودة جداً. الزبونة بتسأل عن ${pType}. السؤال هو: ${text}` }] }]
-                })
-            });
-            const data = await res.json();
-            const reply = data.candidates[0].content.parts[0].text;
+           const res = await fetch("/api/chat", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({
+    type: pType,
+    message: text,
+    history: []
+  })
+});
+
+const data = await res.json();
+const reply = data.reply || "معلش يا قمر… قولي تاني 🎀";
+
             document.getElementById('loading').classList.add('hidden');
             addMsg(reply, 'bot');
         } catch (e) {
