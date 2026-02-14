@@ -1,18 +1,10 @@
-// api/chat.js
-import https from "node:https";
-
-function readBody(req) {
-  return new Promise((resolve) => {
-    // لو Vercel عامل parsing جاهز
-    if (req.body && typeof req.body === "object") return resolve(req.body);
-
-    let raw = "";
-    req.on("data", (c) => (raw += c));
-    req.on("end", () => {
-      try { resolve(raw ? JSON.parse(raw) : {}); }
-      catch { resolve({}); }
-    });
-  });
+// api/chat.js  (NO KEY NEEDED ✅)
+async function readBodyJSON(req) {
+  if (req.body && typeof req.body === "object") return req.body;
+  let raw = "";
+  for await (const chunk of req) raw += chunk;
+  if (!raw) return {};
+  try { return JSON.parse(raw); } catch { return {}; }
 }
 
 function send(res, status, obj) {
@@ -22,107 +14,73 @@ function send(res, status, obj) {
   res.end(JSON.stringify(obj));
 }
 
-function postJSON(url, payload) {
-  return new Promise((resolve, reject) => {
-    const u = new URL(url);
-    const data = JSON.stringify(payload);
+const DB = {
+  "خاتم": [
+    "💍 الخاتم يجنن عليكي! ابعديه عن المية والصابون والكحول. لو هتغسلي إيدك شيليه عشان ميتزحلقش.",
+    "✨ لو فيه فصوص: نظافة بقطنة ناشفة أو فرشة ناعمة جدًا (من غير مية). وخزنيه لوحده عشان ميتخربش."
+  ],
+  "سلسلة": [
+    "📿 السلاسل الرقيقة بتحب الدلع: بلاش نوم بيها عشان متتعقدش، وبلاش برفان مباشر.",
+    "💗 لو اتعقدت: افرديها على سطح ناعم وحركي العقدة بإبرة رفيعة/دبوس بهدوء."
+  ],
+  "ساعة": [
+    "⌚ حتى لو ضد المية، الصابون والكيماويات بيبوظوا اللمعة/الجلد. امسحيها بقطنة ناشفة.",
+    "👜 خدي بالك من العطور على السير (الجلد خصوصًا) لأنها بتغيّر اللون."
+  ],
+  "غوايش": [
+    "💫 الغوايش محتاجة حرص: ابعديها عن الخبطات ولمعيها بقطنة ناشفة.",
+    "✨ متتحطيش معاها قطع حادة في نفس الكيس عشان متتخربش."
+  ],
+  "عامة": [
+    "🎀 أي إكسسوار: ابعديه عن المية والكحول والبرفان المباشر… وخزنيه في كيس/علبة لوحده.",
+    "💖 لو القطعة لونها بدأ يروح: غالبًا بسبب عرق/عطر/مية… خليها ناشفة دايمًا بعد اللبس."
+  ]
+};
 
-    const req = https.request(
-      {
-        hostname: u.hostname,
-        path: u.pathname + u.search,
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Content-Length": Buffer.byteLength(data),
-        },
-      },
-      (res) => {
-        let body = "";
-        res.on("data", (c) => (body += c));
-        res.on("end", () => {
-          let json = {};
-          try { json = body ? JSON.parse(body) : {}; } catch {}
-          resolve({ ok: res.statusCode >= 200 && res.statusCode < 300, status: res.statusCode, json });
-        });
-      }
-    );
+const QUICK = [
+  { k: ["سعر","بكام","الثمن","كام"], r: "💗 الأسعار بتختلف حسب الخامة والموديل… قوليلي القطعة/صورة أو وصفيها وأنا أقولك أنسب اختيار." },
+  { k: ["مقاس","قياس","واسع","ضيق"], r: "📏 قوليلي مقاسك/محيط الإصبع أو المعصم بالسنتي… وأنا أساعدك تختاري المقاس الصح." },
+  { k: ["شحن","توصيل","دليفري"], r: "🚚 التوصيل متاح—قوليلي محافظتك/منطقتك وهقولك المدة والتكلفة." },
+  { k: ["مات","تغير","اسود","صدأ","تسود"], r: "🖤 ده بيحصل من مية/عرق/عطر. امسحيها ناشف فورًا وخزنيها بعيد عن الرطوبة. قوليلي نوعها (خاتم/سلسلة/ساعة/غوايش) عشان أديكي طريقة أنسب." }
+];
 
-    req.on("error", reject);
-    req.write(data);
-    req.end();
-  });
+function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+
+function detectType(fallbackType, message) {
+  const m = message;
+  if (m.includes("خاتم")) return "خاتم";
+  if (m.includes("سلسلة") || m.includes("chain")) return "سلسلة";
+  if (m.includes("ساعة") || m.includes("watch")) return "ساعة";
+  if (m.includes("غويشة") || m.includes("غوايش") || m.includes("اسورة") || m.includes("أسورة")) return "غوايش";
+  return fallbackType;
 }
 
 export default async function handler(req, res) {
   try {
-    // Ping سريع للتأكد إن الـ API شغال: افتح /api/chat في المتصفح
     if (req.method === "GET") {
-      return send(res, 200, {
-        ok: true,
-        route: "/api/chat",
-        hasKey: !!process.env.GEMINI_API_KEY,
-        model: process.env.GEMINI_MODEL || "gemini-1.5-flash",
-      });
+      return send(res, 200, { ok: true, mode: "NO-KEY-RULES", route: "/api/chat" });
     }
-
-    if (req.method === "OPTIONS") return res.end();
     if (req.method !== "POST") return send(res, 405, { error: "Method not allowed" });
 
-    const key = process.env.GEMINI_API_KEY;
-    if (!key) return send(res, 500, { error: "Missing GEMINI_API_KEY on Vercel" });
-
-    const body = await readBody(req);
-    const type = String(body.type || "عامة");
+    const body = await readBodyJSON(req);
+    const typeIn = String(body.type || "عامة");
     const message = String(body.message || "").trim();
-    const history = Array.isArray(body.history) ? body.history : [];
 
-    if (!message) return send(res, 400, { error: "Empty message received" });
+    if (!message) return send(res, 400, { reply: "قولي سؤالك يا قمر 🎀" });
 
-    const model = process.env.GEMINI_MODEL || "gemini-1.5-flash";
-
-    const systemText = `أنتِ مساعدة في محل إكسسوارات اسمه "فيونكة".
-ردّي باللهجة المصرية البناتية (لطيفة جدًا).
-خلي الرد قصير وواضح وعملي.
-ممنوع تذكري إنك AI أو تذكري API.
-لو السؤال عن عناية/تنضيف: ادي خطوات عملية + تحذيرات.
-نوع القطعة الحالي: ${type}.`;
-
-    const trimmedHistory = history
-      .filter(
-        (x) =>
-          x &&
-          (x.role === "user" || x.role === "model") &&
-          Array.isArray(x.parts) &&
-          x.parts[0] &&
-          typeof x.parts[0].text === "string"
-      )
-      .slice(-12);
-
-    const url =
-      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(
-        key
-      )}`;
-
-    const payload = {
-      system_instruction: { parts: [{ text: systemText }] },
-      contents: [...trimmedHistory, { role: "user", parts: [{ text: message }] }],
-      generationConfig: { temperature: 0.7, topP: 0.9, maxOutputTokens: 450 },
-    };
-
-    const r = await postJSON(url, payload);
-
-    if (!r.ok) {
-      // رجّع تفاصيل الخطأ للواجهة عشان تعرف السبب الحقيقي
-      return send(res, 500, { error: "Gemini API error", details: r.json });
+    // ردود سريعة حسب كلمات
+    for (const item of QUICK) {
+      if (item.k.some(w => message.includes(w))) {
+        return send(res, 200, { reply: item.r });
+      }
     }
 
-    const reply =
-      r.json?.candidates?.[0]?.content?.parts?.map((p) => p?.text).filter(Boolean).join("\n") ||
-      "معلش يا قمر… قولي تاني بشكل أبسط 🎀";
+    const t = detectType(typeIn, message);
+    const tips = DB[t] || DB["عامة"];
+    const reply = `🎀 تمام يا قمر… بالنسبة للـ <b>${t}</b>:\n\n${pick(tips)}\n\nلو تحبي قوليلي بتتلبس إمتى وبتتعرض لمية/عطر قد إيه؟`;
 
     return send(res, 200, { reply });
   } catch (e) {
-    return send(res, 500, { error: "Server error", details: String(e?.message || e) });
+    return send(res, 500, { reply: "معلش يا قمر حصل مشكلة… جربي تاني 🎀" });
   }
 }
