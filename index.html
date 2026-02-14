@@ -1,3 +1,4 @@
+<!-- index.html -->
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
@@ -10,19 +11,19 @@
 
   <style>
     body { font-family:'Cairo',sans-serif; background:#fff5f7; margin:0; padding:0; overscroll-behavior:none; }
-    .mobile-container{ max-width:450px; margin:0 auto; background:#fff; height:100vh; display:flex; flex-direction:column; box-shadow:0 0 20px rgba(0,0,0,.05); }
-    .chat-area{ flex:1; overflow-y:auto; padding:15px; background-image:url('https://www.transparenttextures.com/patterns/pink-dust.png'); }
-    .bubble{ max-width:80%; padding:12px 16px; border-radius:20px; font-size:14px; line-height:1.6; margin-bottom:10px; box-shadow:0 2px 5px rgba(0,0,0,.02); word-break:break-word; }
-    .bot{ background:#fff; color:#444; align-self:flex-start; border-bottom-right-radius:6px; border:1px solid #fce4ec; }
-    .user{ background:#ff85a2; color:#fff; align-self:flex-end; border-bottom-left-radius:6px; }
-    .input-box{ background:#fff; padding:15px; border-top:1px solid #ffebee; display:flex; gap:10px; align-items:center; }
-    input{ flex:1; background:#f8f9fa; border:1px solid #eee; padding:12px 20px; border-radius:30px; outline:none; font-size:14px; }
-    .send-btn{ background:#ff5c8d; color:#fff; width:45px; height:45px; border-radius:50%; display:flex; align-items:center; justify-content:center; border:none; cursor:pointer; box-shadow:0 4px 10px rgba(255,92,141,.3); }
-    .send-btn:disabled{ opacity:.6; cursor:not-allowed; box-shadow:none; }
-    .typing{ display:flex; gap:4px; padding:10px; }
-    .dot{ width:6px; height:6px; background:#ff85a2; border-radius:50%; animation:blink 1.4s infinite; }
-    .dot:nth-child(2){ animation-delay:.2s; } .dot:nth-child(3){ animation-delay:.4s; }
-    @keyframes blink{ 0%,100%{opacity:.3} 50%{opacity:1} }
+    .mobile-container { max-width:450px; margin:0 auto; background:#fff; height:100vh; display:flex; flex-direction:column; box-shadow:0 0 20px rgba(0,0,0,0.05); }
+    .chat-area { flex:1; overflow-y:auto; padding:15px; background-image:url('https://www.transparenttextures.com/patterns/pink-dust.png'); }
+    .bubble { max-width:80%; padding:12px 16px; border-radius:20px; font-size:14px; line-height:1.6; margin-bottom:10px; box-shadow:0 2px 5px rgba(0,0,0,0.02); word-break:break-word; }
+    .bot { background:#fff; color:#444; align-self:flex-start; border-bottom-right-radius:6px; border:1px solid #fce4ec; }
+    .user { background:#ff85a2; color:#fff; align-self:flex-end; border-bottom-left-radius:6px; }
+    .input-box { background:#fff; padding:15px; border-top:1px solid #ffebee; display:flex; gap:10px; align-items:center; }
+    input { flex:1; background:#f8f9fa; border:1px solid #eee; padding:12px 20px; border-radius:30px; outline:none; font-size:14px; }
+    .send-btn { background:#ff5c8d; color:#fff; width:45px; height:45px; border-radius:50%; display:flex; align-items:center; justify-content:center; border:none; cursor:pointer; box-shadow:0 4px 10px rgba(255,92,141,.3); }
+    .send-btn:disabled { opacity:.6; cursor:not-allowed; box-shadow:none; }
+    .typing { display:flex; gap:4px; padding:10px; }
+    .dot { width:6px; height:6px; background:#ff85a2; border-radius:50%; animation:blink 1.4s infinite; }
+    .dot:nth-child(2) { animation-delay:.2s; } .dot:nth-child(3) { animation-delay:.4s; }
+    @keyframes blink { 0%,100%{opacity:.3} 50%{opacity:1} }
   </style>
 </head>
 
@@ -54,32 +55,9 @@
 
 <script>
   const FyonkaDB = {
-    "خاتم": "💍 الخاتم يجنن عليكي! بس نصيحة فيونكة: ابعدي عنه الصابون والمية…",
-    "سلسلة": "📿 السلاسل الرقيقة بتحب الدلع…",
-    "ساعة": "⌚ حتى لو ضد المية بلاش صابون وكيماويات…",
-    "غوايش": "💫 ابعديها عن الخبطات ولمعيها بقطنة ناشفة…",
-    "عامة": "نورتي يا قمر 🎀 ابعدي عن المية والكحول والبرفان المباشر…"
+    "خاتم": "💍 ابعدي عن الصابون والمية…",
+    "سلسلة": "📿 متناميش بيها…",
+    "ساعة": "⌚ بلاش صابون وكيماويات…",
+    "غوايش": "💫 لمعيها بقطنة ناشفة…",
+    "عامة": "🎀 ابعدي عن المية والكحول والبرفان المباشر…"
   };
-
-  const params = new URLSearchParams(location.search);
-  const DEBUG = params.get("debug") === "1";
-
-  const allowed = ["خاتم","سلسلة","ساعة","غوايش","عامة"];
-  const rawType = (params.get("type") || "عامة").trim();
-  const pType = allowed.includes(rawType) ? rawType : "عامة";
-
-  const history = [];
-  let busy = false;
-
-  function escapeHTML(str){
-    return String(str)
-      .replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;")
-      .replaceAll('"',"&quot;").replaceAll("'","&#039;");
-  }
-
-  function addMsg(text, side, allowHTML=false){
-    const box = document.getElementById("chatBox");
-    const div = document.createElement("div");
-    div.className = `bubble ${side}`;
-    if (allowHTML) div.innerHTML = text;
-    else div.textCo
