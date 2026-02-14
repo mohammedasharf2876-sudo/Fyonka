@@ -1,46 +1,83 @@
-export default async function handler(req, res) {
-  // Helpers
-  const send = (status, obj) => {
-    res.status(status);
-    res.setHeader("Content-Type", "application/json; charset=utf-8");
-    res.setHeader("Cache-Control", "no-store");
-    return res.end(JSON.stringify(obj));
-  };
+// api/chat.js
+import https from "node:https";
 
-  const readBodyJSON = async () => {
+function readBody(req) {
+  return new Promise((resolve) => {
     // لو Vercel عامل parsing جاهز
-    if (req.body && typeof req.body === "object") return req.body;
+    if (req.body && typeof req.body === "object") return resolve(req.body);
 
-    // Parse يدوي مضمون
     let raw = "";
-    for await (const chunk of req) raw += chunk;
-    if (!raw) return {};
-    try { return JSON.parse(raw); } catch { return {}; }
-  };
+    req.on("data", (c) => (raw += c));
+    req.on("end", () => {
+      try { resolve(raw ? JSON.parse(raw) : {}); }
+      catch { resolve({}); }
+    });
+  });
+}
 
+function send(res, status, obj) {
+  res.statusCode = status;
+  res.setHeader("Content-Type", "application/json; charset=utf-8");
+  res.setHeader("Cache-Control", "no-store");
+  res.end(JSON.stringify(obj));
+}
+
+function postJSON(url, payload) {
+  return new Promise((resolve, reject) => {
+    const u = new URL(url);
+    const data = JSON.stringify(payload);
+
+    const req = https.request(
+      {
+        hostname: u.hostname,
+        path: u.pathname + u.search,
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Content-Length": Buffer.byteLength(data),
+        },
+      },
+      (res) => {
+        let body = "";
+        res.on("data", (c) => (body += c));
+        res.on("end", () => {
+          let json = {};
+          try { json = body ? JSON.parse(body) : {}; } catch {}
+          resolve({ ok: res.statusCode >= 200 && res.statusCode < 300, status: res.statusCode, json });
+        });
+      }
+    );
+
+    req.on("error", reject);
+    req.write(data);
+    req.end();
+  });
+}
+
+export default async function handler(req, res) {
   try {
-    // Debug GET: افتح /api/chat في المتصفح وشوف ok/hasKey
+    // Ping سريع للتأكد إن الـ API شغال: افتح /api/chat في المتصفح
     if (req.method === "GET") {
-      return send(200, {
+      return send(res, 200, {
         ok: true,
         route: "/api/chat",
         hasKey: !!process.env.GEMINI_API_KEY,
-        model: process.env.GEMINI_MODEL || "gemini-1.5-flash"
+        model: process.env.GEMINI_MODEL || "gemini-1.5-flash",
       });
     }
 
-    if (req.method === "OPTIONS") return res.status(204).end();
-    if (req.method !== "POST") return send(405, { error: "Method not allowed" });
+    if (req.method === "OPTIONS") return res.end();
+    if (req.method !== "POST") return send(res, 405, { error: "Method not allowed" });
 
     const key = process.env.GEMINI_API_KEY;
-    if (!key) return send(500, { error: "Missing GEMINI_API_KEY (Vercel Env Vars)" });
+    if (!key) return send(res, 500, { error: "Missing GEMINI_API_KEY on Vercel" });
 
-    const body = await readBodyJSON();
+    const body = await readBody(req);
     const type = String(body.type || "عامة");
     const message = String(body.message || "").trim();
     const history = Array.isArray(body.history) ? body.history : [];
 
-    if (!message) return send(400, { error: "Empty message received" });
+    if (!message) return send(res, 400, { error: "Empty message received" });
 
     const model = process.env.GEMINI_MODEL || "gemini-1.5-flash";
 
@@ -63,31 +100,29 @@ export default async function handler(req, res) {
       .slice(-12);
 
     const url =
-      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent` +
-      `?key=${encodeURIComponent(key)}`;
+      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(
+        key
+      )}`;
 
-    const r = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        system_instruction: { parts: [{ text: systemText }] },
-        contents: [...trimmedHistory, { role: "user", parts: [{ text: message }] }],
-        generationConfig: { temperature: 0.7, topP: 0.9, maxOutputTokens: 450 },
-      }),
-    });
+    const payload = {
+      system_instruction: { parts: [{ text: systemText }] },
+      contents: [...trimmedHistory, { role: "user", parts: [{ text: message }] }],
+      generationConfig: { temperature: 0.7, topP: 0.9, maxOutputTokens: 450 },
+    };
 
-    const data = await r.json().catch(() => ({}));
+    const r = await postJSON(url, payload);
 
     if (!r.ok) {
-      return send(500, { error: "Gemini API error", details: data });
+      // رجّع تفاصيل الخطأ للواجهة عشان تعرف السبب الحقيقي
+      return send(res, 500, { error: "Gemini API error", details: r.json });
     }
 
     const reply =
-      data?.candidates?.[0]?.content?.parts?.map((p) => p?.text).filter(Boolean).join("\n") ||
+      r.json?.candidates?.[0]?.content?.parts?.map((p) => p?.text).filter(Boolean).join("\n") ||
       "معلش يا قمر… قولي تاني بشكل أبسط 🎀";
 
-    return send(200, { reply });
+    return send(res, 200, { reply });
   } catch (e) {
-    return send(500, { error: "Server error", details: String(e?.message || e) });
+    return send(res, 500, { error: "Server error", details: String(e?.message || e) });
   }
 }
